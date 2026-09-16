@@ -467,6 +467,24 @@
   .sc-freight-actions{margin-top:8px;}
   .sc-freight-accept{width:100%;text-align:center;background:#0a0a0a;color:var(--yellow);border:none;}
   .sc-freight-disclaimer{display:block;margin-top:6px;font-size:.72rem;font-weight:500;color:rgba(10,10,10,.65);}
+  .sc-freight-options{display:flex;flex-direction:column;gap:8px;margin-top:2px;}
+  .sc-freight-option{
+    background:rgba(255,255,255,.55);border:1px solid rgba(10,10,10,.15);border-radius:8px;
+    padding:9px 11px;display:flex;flex-direction:column;gap:4px;
+  }
+  .sc-freight-option-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+  .sc-freight-option-name{font-size:.82rem;font-weight:700;color:#0a0a0a;}
+  .sc-freight-option-tag{
+    font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+    padding:2px 7px;border-radius:20px;background:#0a0a0a;color:var(--yellow);white-space:nowrap;
+  }
+  .sc-freight-option-tag.alt{background:rgba(10,10,10,.12);color:#0a0a0a;}
+  .sc-freight-option-value{font-size:1.05rem;font-weight:800;color:#0a0a0a;}
+  .sc-freight-option-prazo{font-size:.74rem;color:rgba(10,10,10,.7);}
+  .sc-freight-option-accept{
+    margin-top:4px;width:100%;text-align:center;background:#0a0a0a;color:var(--yellow);
+    border:none;padding:7px 10px;border-radius:6px;font-size:.78rem;font-weight:700;cursor:pointer;
+  }
 
   @media (max-width:760px){
     .sc-product{grid-template-columns:1fr;}
@@ -1426,12 +1444,90 @@
         return {peso:2.5, tipo:'padrao'};
       }
 
-      function precoFrete(distKm, classe){
-        var base, taxaKm;
-        if(classe.tipo === 'veiculo'){ base = 150; taxaKm = 1.85; }
-        else if(classe.tipo === 'grande'){ base = 25; taxaKm = 0.38; }
-        else { base = 12; taxaKm = 0.09 * Math.max(1, classe.peso/3); }
-        return base + distKm * taxaKm;
+      // Base de cálculo por zona de distância a partir de Fortaleza-CE, inspirada na
+      // estrutura de preços praticada por Correios, Jadlog, Loggi, J&T Express,
+      // Braspress, Total Express, Azul Cargo Express e LATAM Cargo.
+      // Observação: transportadoras privadas/cargo negociam tabela por CNPJ e não
+      // publicam tarifário público; os valores abaixo são uma estimativa de
+      // referência por zona e peso, não uma cotação oficial em tempo real.
+      function freteZona(distKm){
+        if(distKm <= 0) return 0;      // Fortaleza (local)
+        if(distKm <= 600) return 1;    // Nordeste próximo (CE, PI, RN, PB, PE, AL, SE)
+        if(distKm <= 1500) return 2;   // Nordeste distante / Norte próximo (BA, MA, TO, PA)
+        if(distKm <= 2500) return 3;   // Centro-Oeste / Sudeste (DF, GO, MG, ES, RJ, SP)
+        return 4;                      // Sul / Norte remoto (PR, SC, RS, AM, RR, AP, AC, RO)
+      }
+
+      var ZONA_MULT = {
+        correios: [0.60, 1.00, 1.40, 1.90, 2.60],
+        privado:  [0.55, 0.85, 1.35, 1.90, 2.75],
+        grande:   [0.70, 1.00, 1.30, 1.70, 2.30],
+        rodo:     [0.50, 1.00, 1.35, 1.75, 2.30],
+        aereo:    [0.60, 0.90, 1.10, 1.30, 1.60]
+      };
+
+      function precoCorreios(pesoKg, zona){
+        return (15.70 + Math.max(0, pesoKg - 1) * 3.20) * ZONA_MULT.correios[zona];
+      }
+      function precoPrivado(pesoKg, zona){
+        // Referência combinada Jadlog .Package / Loggi / J&T Express
+        return (13.90 + Math.max(0, pesoKg - 1) * 2.70) * ZONA_MULT.privado[zona];
+      }
+      function precoGrande(pesoKg, zona){
+        // Referência combinada Jadlog Package / Loggi / Total Express (cargas maiores)
+        return (42 + pesoKg * 3.10) * ZONA_MULT.grande[zona];
+      }
+      function precoVeiculoRodo(pesoKg, zona){
+        // Referência combinada Braspress / Total Express (carga fracionada rodoviária)
+        return (175 + pesoKg * 2.55) * ZONA_MULT.rodo[zona];
+      }
+      function precoVeiculoAereo(pesoKg, zona){
+        // Referência combinada Azul Cargo Express / LATAM Cargo (modal aéreo)
+        return (255 + pesoKg * 5.60) * ZONA_MULT.aereo[zona];
+      }
+
+      function calcularOpcoesFrete(distKm, classe){
+        var zona = freteZona(distKm);
+        var peso = classe.peso;
+        var opcoes = [];
+
+        if(classe.tipo === 'veiculo'){
+          var diasRodoMin = distKm <= 0 ? 1 : Math.max(2, Math.ceil(distKm/350));
+          var diasAereoMin = distKm <= 0 ? 1 : Math.max(1, Math.ceil(distKm/900));
+          opcoes.push({
+            nome: 'Rodoviário — Braspress / Total Express', tag: 'Econômico',
+            valor: precoVeiculoRodo(peso, zona), prazo: diasRodoMin + ' a ' + (diasRodoMin+4) + ' dias úteis'
+          });
+          opcoes.push({
+            nome: 'Aéreo — Azul Cargo Express / LATAM Cargo', tag: 'Expresso',
+            valor: precoVeiculoAereo(peso, zona), prazo: diasAereoMin + ' a ' + (diasAereoMin+2) + ' dias úteis'
+          });
+        } else if(classe.tipo === 'grande'){
+          var diasMin = distKm <= 0 ? 1 : Math.max(2, Math.ceil(distKm/400));
+          opcoes.push({
+            nome: 'Jadlog Package / Loggi / Total Express', tag: 'Estimado',
+            valor: precoGrande(peso, zona), prazo: diasMin + ' a ' + (diasMin+5) + ' dias úteis'
+          });
+        } else {
+          var dMin = distKm <= 0 ? 0 : Math.max(1, Math.ceil(distKm/450));
+          var correiosVal = precoCorreios(peso, zona);
+          var privadoVal = precoPrivado(peso, zona);
+          var primeiro = privadoVal <= correiosVal
+            ? {nome:'Jadlog / Loggi / J&T Express', valor:privadoVal}
+            : {nome:'Correios (PAC/SEDEX)', valor:correiosVal};
+          var segundo = privadoVal <= correiosVal
+            ? {nome:'Correios (PAC/SEDEX)', valor:correiosVal}
+            : {nome:'Jadlog / Loggi / J&T Express', valor:privadoVal};
+          opcoes.push({
+            nome: primeiro.nome, tag: 'Melhor preço estimado', valor: primeiro.valor,
+            prazo: dMin + ' a ' + (dMin + (distKm<=0?1:6)) + ' dias úteis'
+          });
+          opcoes.push({
+            nome: segundo.nome, tag: 'Alternativa', valor: segundo.valor,
+            prazo: dMin + ' a ' + (dMin + (distKm<=0?1:8)) + ' dias úteis'
+          });
+        }
+        return opcoes;
       }
 
       function geocode(query){
@@ -1496,21 +1592,38 @@
       }
 
       function renderFreightResult(box, resultEl, destinoNome, distKm, classe){
-        var valor = precoFrete(distKm, classe);
-        var dias = distKm === 0 ? '0 a 1' : (Math.max(1, Math.ceil(distKm/450)) + ' a ' + (Math.max(1, Math.ceil(distKm/450)) + 2));
-        var valorFmt = formatBRL(valor);
+        var opcoes = calcularOpcoesFrete(distKm, classe);
         var distFmt = distKm === 0 ? '' : ' (~' + Math.round(distKm) + ' km por rodovia)';
+
+        var optionsHtml = opcoes.map(function(op, idx){
+          var valorFmt = formatBRL(op.valor);
+          return (
+            '<div class="sc-freight-option" data-idx="' + idx + '">' +
+              '<div class="sc-freight-option-head">' +
+                '<span class="sc-freight-option-name">' + escapeHtml(op.nome) + '</span>' +
+                '<span class="sc-freight-option-tag' + (op.tag === 'Alternativa' ? ' alt' : '') + '">' + escapeHtml(op.tag) + '</span>' +
+              '</div>' +
+              '<span class="sc-freight-option-value">' + valorFmt + '</span>' +
+              '<span class="sc-freight-option-prazo">Prazo estimado: ' + op.prazo + '</span>' +
+              '<button type="button" class="sc-freight-option-accept">Aceitar esta opção e falar com consultor</button>' +
+            '</div>'
+          );
+        }).join('');
+
         resultEl.innerHTML =
-          'Frete de Fortaleza-CE até <b>' + escapeHtml(destinoNome) + '</b>' + distFmt + ':<br>' +
-          '<span class="sc-freight-value">' + valorFmt + '</span> · prazo estimado ' + dias + ' dias úteis' +
-          '<div class="sc-freight-actions">' +
-            '<button type="button" class="btn btn-primary sc-freight-accept">Aceitar frete e falar com consultor</button>' +
-          '</div>' +
-          '<span class="sc-freight-disclaimer">Valor estimado por distância real; o consultor confirma o valor final e a transportadora no WhatsApp.</span>';
-        resultEl.querySelector('.sc-freight-accept').addEventListener('click', function(){
-          var nome = box.getAttribute('data-nome') || 'produto';
-          var msg = 'Olá! Quero confirmar o frete para *' + nome + '* até ' + destinoNome + '. Valor estimado do frete: ' + valorFmt + ' (prazo ~' + dias + ' dias úteis). Pode confirmar?';
-          window.open('https://wa.me/558581748100?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
+          'Frete de Fortaleza-CE até <b>' + escapeHtml(destinoNome) + '</b>' + distFmt + ':' +
+          '<div class="sc-freight-options">' + optionsHtml + '</div>' +
+          '<span class="sc-freight-disclaimer">Valores estimados por peso e distância, com base na estrutura de preços de Correios, Jadlog, Loggi, J&T Express, Braspress, Total Express, Azul Cargo Express e LATAM Cargo. O consultor confirma o valor final e a transportadora exata no WhatsApp.</span>';
+
+        resultEl.querySelectorAll('.sc-freight-option').forEach(function(card, idx){
+          var btn = card.querySelector('.sc-freight-option-accept');
+          var op = opcoes[idx];
+          btn.addEventListener('click', function(){
+            var nome = box.getAttribute('data-nome') || 'produto';
+            var valorFmt = formatBRL(op.valor);
+            var msg = 'Olá! Quero confirmar o frete para *' + nome + '* até ' + destinoNome + ' via ' + op.nome + '. Valor estimado: ' + valorFmt + ' (prazo ~' + op.prazo + '). Pode confirmar?';
+            window.open('https://wa.me/558581748100?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
+          });
         });
       }
 
