@@ -1275,7 +1275,7 @@
       var freightHtml =
         '<div class="sc-freight-box" data-nome="' + escapeHtml(p.nome) + '" data-sku="' + escapeHtml(p.sku||'') + '" data-preco="' + escapeHtml(p.preco||'') + '">' +
           '<div class="sc-freight-title">Calcule o frete</div>' +
-          '<p class="sc-freight-desc"><b>Digite a cidade, o CEP ou o estado de destino</b> — calculamos a distância real a partir de Fortaleza-CE e o valor estimado do frete aparece automaticamente.</p>' +
+          '<p class="sc-freight-desc"><b>Digite a cidade, o CEP ou o estado de destino</b> — calculamos a distância real a partir do nosso estoque em Fortaleza-CE (bairro Sapiranga-Coité) e o valor estimado do frete aparece automaticamente, para qualquer município, estado ou rua do Brasil.</p>' +
           '<div class="sc-freight-form">' +
             '<input type="text" class="sc-freight-input" placeholder="Ex: Juazeiro do Norte-CE, ou CEP">' +
             '<button type="button" class="btn btn-primary sc-freight-btn">Calcular</button>' +
@@ -1437,8 +1437,9 @@
       });
 
       // "Calcule o frete": simple regional estimate based on CEP/state typed by the customer
-      // Origem fixa: Fortaleza-CE
-      var ORIGEM_LAT = -3.7172, ORIGEM_LON = -38.5433;
+      // Origem fixa: R. Mário Alencar Araripe, 1565 - Sl 106 - Sapiranga-Coité,
+      // Fortaleza - CE, 60830-025 (endereço de onde sai o estoque da WUANG)
+      var ORIGEM_LAT = -3.809199, ORIGEM_LON = -38.4769986;
       var geocodeCache = {};
 
       function haversineKm(lat1, lon1, lat2, lon2){
