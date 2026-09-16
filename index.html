@@ -1265,7 +1265,7 @@
             '<div class="sc-visa-only"><span class="sc-visa-badge">VISA</span><span class="sc-visa-only-text">Aceitamos somente cartão de crédito Visa</span></div>' +
           '</div>' +
           '<div class="sc-card-frame" hidden>' +
-            '<p class="sc-card-frame-note">Preencha os dados do seu cartão Visa com segurança abaixo:</p>' +
+            '<p class="sc-card-frame-note">Preencha os dados do cartão (número, nome, validade e CVV) com segurança abaixo — use um cartão <b>Visa</b>:</p>' +
             '<div class="sc-card-iframe-wrap"><iframe class="sc-card-iframe" title="Pagamento seguro" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>' +
             '<p class="sc-card-fallback">O formulário não carregou? <a target="_blank" rel="noopener noreferrer" class="sc-card-fallback-link" href="' + escapeHtml(p.tonLink) + '">Abrir pagamento seguro em nova aba</a></p>' +
           '</div>' +
@@ -1368,7 +1368,7 @@
           };
           var info = regioes[d0] || ['Brasil', '5 a 10', 'R$ 49,90'];
           local = info[0]; dias = info[1]; valor = info[2];
-        } else if(raw.length >= 3){
+        } else if(raw.length >= 2){
           dias = '3 a 10'; valor = 'R$ 39,90 a R$ 59,90'; local = 'Brasil (todas as regiões, municípios e estados)';
         } else {
           resultEl.hidden = true;
@@ -1383,7 +1383,7 @@
         var debounceTimer = null;
         input.addEventListener('input', function(){
           clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(function(){ calcFreight(box); }, 500);
+          debounceTimer = setTimeout(function(){ calcFreight(box); }, 250);
         });
         input.addEventListener('blur', function(){ clearTimeout(debounceTimer); calcFreight(box); });
         if(btn){
