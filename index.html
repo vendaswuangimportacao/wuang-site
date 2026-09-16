@@ -1209,7 +1209,7 @@
       var freightHtml =
         '<div class="sc-freight-box">' +
           '<div class="sc-freight-title">Calcule o frete</div>' +
-          '<p class="sc-freight-desc"><b>Digite seu CEP, bairro, cidade ou estado</b> para calcular o frete e o prazo de entrega para todo o Brasil.</p>' +
+          '<p class="sc-freight-desc"><b>Digite seu CEP, bairro, cidade ou estado</b> — o frete e o prazo de entrega para todo o Brasil aparecem automaticamente.</p>' +
           '<div class="sc-freight-form">' +
             '<input type="text" class="sc-freight-input" placeholder="Ex: CEP, bairro, cidade ou estado">' +
             '<button type="button" class="btn btn-primary sc-freight-btn">Calcular</button>' +
@@ -1339,44 +1339,56 @@
       });
 
       // "Calcule o frete": simple regional estimate based on CEP/state typed by the customer
-      bodyEl.querySelectorAll('.sc-freight-btn').forEach(function(btn){
-        btn.addEventListener('click', function(){
-          var box = btn.closest('.sc-freight-box');
-          var input = box.querySelector('.sc-freight-input');
-          var resultEl = box.querySelector('.sc-freight-result');
-          var raw = (input.value || '').trim();
-          if(!raw){
-            resultEl.hidden = false;
-            resultEl.textContent = 'Digite um CEP, bairro, cidade ou estado para calcular.';
-            return;
-          }
-          var digits = raw.replace(/\D/g,'');
-          var lower = raw.toLowerCase();
-          var dias, valor, local;
-          if(lower.indexOf('fortaleza') !== -1 || lower.indexOf('ceará') !== -1 || lower.indexOf('ceara') !== -1){
-            dias = '1 a 2'; valor = 'a combinar (entrega local/retirada)'; local = 'Fortaleza e região (CE)';
-          } else if(digits.length >= 5){
-            var d0 = digits.charAt(0);
-            var regioes = {
-              '0':['Sudeste (SP)', '3 a 6', 'R$ 39,90'],
-              '1':['Sudeste (SP)', '3 a 6', 'R$ 39,90'],
-              '2':['Sudeste (RJ/ES)', '4 a 7', 'R$ 44,90'],
-              '3':['Sudeste (MG)', '4 a 7', 'R$ 44,90'],
-              '4':['Nordeste (BA/SE)', '3 a 5', 'R$ 34,90'],
-              '5':['Nordeste (PE/AL/PB/RN)', '2 a 4', 'R$ 29,90'],
-              '6':['Norte/Nordeste (CE/PI/MA/PA/AM)', '2 a 5', 'R$ 29,90'],
-              '7':['Centro-Oeste (DF/GO/TO/MT/MS)', '5 a 8', 'R$ 49,90'],
-              '8':['Sul (PR/SC)', '5 a 8', 'R$ 49,90'],
-              '9':['Sul (RS)', '6 a 9', 'R$ 54,90']
-            };
-            var info = regioes[d0] || ['Brasil', '5 a 10', 'R$ 49,90'];
-            local = info[0]; dias = info[1]; valor = info[2];
-          } else {
-            dias = '3 a 10'; valor = 'R$ 39,90 a R$ 59,90'; local = 'Brasil (todas as regiões, municípios e estados)';
-          }
-          resultEl.hidden = false;
-          resultEl.innerHTML = 'Entrega estimada para <b>' + local + '</b>: ' + dias + ' dias úteis — frete estimado ' + valor + '.<br><span style="font-weight:500;font-size:.76rem;">Valor final calculado e confirmado pelo consultor no WhatsApp.</span>';
+      function calcFreight(box){
+        var input = box.querySelector('.sc-freight-input');
+        var resultEl = box.querySelector('.sc-freight-result');
+        var raw = (input.value || '').trim();
+        if(!raw){
+          resultEl.hidden = true;
+          return;
+        }
+        var digits = raw.replace(/\D/g,'');
+        var lower = raw.toLowerCase();
+        var dias, valor, local;
+        if(lower.indexOf('fortaleza') !== -1 || lower.indexOf('ceará') !== -1 || lower.indexOf('ceara') !== -1){
+          dias = '1 a 2'; valor = 'a combinar (entrega local/retirada)'; local = 'Fortaleza e região (CE)';
+        } else if(digits.length >= 5){
+          var d0 = digits.charAt(0);
+          var regioes = {
+            '0':['Sudeste (SP)', '3 a 6', 'R$ 39,90'],
+            '1':['Sudeste (SP)', '3 a 6', 'R$ 39,90'],
+            '2':['Sudeste (RJ/ES)', '4 a 7', 'R$ 44,90'],
+            '3':['Sudeste (MG)', '4 a 7', 'R$ 44,90'],
+            '4':['Nordeste (BA/SE)', '3 a 5', 'R$ 34,90'],
+            '5':['Nordeste (PE/AL/PB/RN)', '2 a 4', 'R$ 29,90'],
+            '6':['Norte/Nordeste (CE/PI/MA/PA/AM)', '2 a 5', 'R$ 29,90'],
+            '7':['Centro-Oeste (DF/GO/TO/MT/MS)', '5 a 8', 'R$ 49,90'],
+            '8':['Sul (PR/SC)', '5 a 8', 'R$ 49,90'],
+            '9':['Sul (RS)', '6 a 9', 'R$ 54,90']
+          };
+          var info = regioes[d0] || ['Brasil', '5 a 10', 'R$ 49,90'];
+          local = info[0]; dias = info[1]; valor = info[2];
+        } else if(raw.length >= 3){
+          dias = '3 a 10'; valor = 'R$ 39,90 a R$ 59,90'; local = 'Brasil (todas as regiões, municípios e estados)';
+        } else {
+          resultEl.hidden = true;
+          return;
+        }
+        resultEl.hidden = false;
+        resultEl.innerHTML = 'Entrega estimada para <b>' + local + '</b>: ' + dias + ' dias úteis — frete estimado ' + valor + '.<br><span style="font-weight:500;font-size:.76rem;">Valor final calculado e confirmado pelo consultor no WhatsApp.</span>';
+      }
+      bodyEl.querySelectorAll('.sc-freight-box').forEach(function(box){
+        var input = box.querySelector('.sc-freight-input');
+        var btn = box.querySelector('.sc-freight-btn');
+        var debounceTimer = null;
+        input.addEventListener('input', function(){
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(function(){ calcFreight(box); }, 500);
         });
+        input.addEventListener('blur', function(){ clearTimeout(debounceTimer); calcFreight(box); });
+        if(btn){
+          btn.addEventListener('click', function(){ clearTimeout(debounceTimer); calcFreight(box); });
+        }
       });
 
       overlay.hidden = false;
