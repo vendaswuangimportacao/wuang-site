@@ -431,8 +431,13 @@
   .sc-freight-btn{flex:none;background:#0a0a0a;color:var(--yellow);border:none;}
   .sc-freight-result{
     background:rgba(10,10,10,.08);border-radius:8px;padding:10px 12px;font-size:.84rem;
-    color:var(--ink);font-weight:600;
+    color:var(--ink);font-weight:600;line-height:1.5;
   }
+  .sc-freight-loading{font-weight:600;opacity:.75;}
+  .sc-freight-value{font-size:1.15rem;font-weight:800;color:#0a0a0a;}
+  .sc-freight-actions{margin-top:8px;}
+  .sc-freight-accept{width:100%;text-align:center;background:#0a0a0a;color:var(--yellow);border:none;}
+  .sc-freight-disclaimer{display:block;margin-top:6px;font-size:.72rem;font-weight:500;color:rgba(10,10,10,.65);}
 
   @media (max-width:760px){
     .sc-product{grid-template-columns:1fr;}
@@ -1207,11 +1212,11 @@
         '</div>';
 
       var freightHtml =
-        '<div class="sc-freight-box">' +
+        '<div class="sc-freight-box" data-nome="' + escapeHtml(p.nome) + '" data-sku="' + escapeHtml(p.sku||'') + '" data-preco="' + escapeHtml(p.preco||'') + '">' +
           '<div class="sc-freight-title">Calcule o frete</div>' +
-          '<p class="sc-freight-desc"><b>Digite seu CEP, bairro, cidade ou estado</b> — o frete e o prazo de entrega para todo o Brasil aparecem automaticamente.</p>' +
+          '<p class="sc-freight-desc"><b>Digite a cidade, o CEP ou o estado de destino</b> — calculamos a distância real a partir de Fortaleza-CE e o valor estimado do frete aparece automaticamente.</p>' +
           '<div class="sc-freight-form">' +
-            '<input type="text" class="sc-freight-input" placeholder="Ex: CEP, bairro, cidade ou estado">' +
+            '<input type="text" class="sc-freight-input" placeholder="Ex: Juazeiro do Norte-CE, ou CEP">' +
             '<button type="button" class="btn btn-primary sc-freight-btn">Calcular</button>' +
           '</div>' +
           '<div class="sc-freight-result" hidden></div>' +
@@ -1339,53 +1344,126 @@
       });
 
       // "Calcule o frete": simple regional estimate based on CEP/state typed by the customer
+      // Origem fixa: Fortaleza-CE
+      var ORIGEM_LAT = -3.7172, ORIGEM_LON = -38.5433;
+      var geocodeCache = {};
+
+      function haversineKm(lat1, lon1, lat2, lon2){
+        var R = 6371;
+        var dLat = (lat2-lat1) * Math.PI/180;
+        var dLon = (lon2-lon1) * Math.PI/180;
+        var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      }
+
+      function pesoClasse(sku){
+        sku = sku || '';
+        if(/^MOTO/i.test(sku) || /^SCOOTER/i.test(sku)) return {peso:90, tipo:'veiculo'};
+        if(/^PATINETE/i.test(sku)) return {peso:15, tipo:'grande'};
+        if(/^BAT/i.test(sku)) return {peso:6, tipo:'padrao'};
+        if(/^PNEU/i.test(sku)) return {peso:9, tipo:'padrao'};
+        return {peso:2.5, tipo:'padrao'};
+      }
+
+      function precoFrete(distKm, classe){
+        var base, taxaKm;
+        if(classe.tipo === 'veiculo'){ base = 150; taxaKm = 1.85; }
+        else if(classe.tipo === 'grande'){ base = 25; taxaKm = 0.38; }
+        else { base = 12; taxaKm = 0.09 * Math.max(1, classe.peso/3); }
+        return base + distKm * taxaKm;
+      }
+
+      function geocode(query){
+        var key = query.toLowerCase();
+        if(geocodeCache[key]) return Promise.resolve(geocodeCache[key]);
+        var digits = query.replace(/\D/g,'');
+        var viacepStep = Promise.resolve(null);
+        if(digits.length === 8){
+          viacepStep = fetch('https://viacep.com.br/ws/' + digits + '/json/')
+            .then(function(r){ return r.ok ? r.json() : null; })
+            .catch(function(){ return null; });
+        }
+        return viacepStep.then(function(viacep){
+          var q;
+          if(viacep && !viacep.erro){
+            q = viacep.localidade + ', ' + viacep.uf + ', Brasil';
+          } else {
+            q = query + ', Brasil';
+          }
+          return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=' + encodeURIComponent(q))
+            .then(function(r){ return r.json(); })
+            .then(function(arr){
+              if(!arr || !arr[0]) throw new Error('not_found');
+              var res = {
+                lat: parseFloat(arr[0].lat),
+                lon: parseFloat(arr[0].lon),
+                nome: (viacep && !viacep.erro) ? (viacep.localidade + '-' + viacep.uf) : arr[0].display_name.split(',').slice(0,2).join(',')
+              };
+              geocodeCache[key] = res;
+              return res;
+            });
+        });
+      }
+
       function calcFreight(box){
         var input = box.querySelector('.sc-freight-input');
         var resultEl = box.querySelector('.sc-freight-result');
         var raw = (input.value || '').trim();
-        if(!raw){
+        if(raw.length < 3){
           resultEl.hidden = true;
           return;
         }
-        var digits = raw.replace(/\D/g,'');
         var lower = raw.toLowerCase();
-        var dias, valor, local;
-        if(lower.indexOf('fortaleza') !== -1 || lower.indexOf('ceará') !== -1 || lower.indexOf('ceara') !== -1){
-          dias = '1 a 2'; valor = 'a combinar (entrega local/retirada)'; local = 'Fortaleza e região (CE)';
-        } else if(digits.length >= 5){
-          var d0 = digits.charAt(0);
-          var regioes = {
-            '0':['Sudeste (SP)', '3 a 6', 'R$ 39,90'],
-            '1':['Sudeste (SP)', '3 a 6', 'R$ 39,90'],
-            '2':['Sudeste (RJ/ES)', '4 a 7', 'R$ 44,90'],
-            '3':['Sudeste (MG)', '4 a 7', 'R$ 44,90'],
-            '4':['Nordeste (BA/SE)', '3 a 5', 'R$ 34,90'],
-            '5':['Nordeste (PE/AL/PB/RN)', '2 a 4', 'R$ 29,90'],
-            '6':['Norte/Nordeste (CE/PI/MA/PA/AM)', '2 a 5', 'R$ 29,90'],
-            '7':['Centro-Oeste (DF/GO/TO/MT/MS)', '5 a 8', 'R$ 49,90'],
-            '8':['Sul (PR/SC)', '5 a 8', 'R$ 49,90'],
-            '9':['Sul (RS)', '6 a 9', 'R$ 54,90']
-          };
-          var info = regioes[d0] || ['Brasil', '5 a 10', 'R$ 49,90'];
-          local = info[0]; dias = info[1]; valor = info[2];
-        } else if(raw.length >= 2){
-          dias = '3 a 10'; valor = 'R$ 39,90 a R$ 59,90'; local = 'Brasil (todas as regiões, municípios e estados)';
-        } else {
-          resultEl.hidden = true;
+        var requestId = (box._freightReq = (box._freightReq || 0) + 1);
+        resultEl.hidden = false;
+        resultEl.innerHTML = '<span class="sc-freight-loading">Calculando distância e frete real…</span>';
+
+        if(lower.indexOf('fortaleza') !== -1){
+          renderFreightResult(box, resultEl, 'Fortaleza-CE (local)', 0, pesoClasse(box.getAttribute('data-sku')));
           return;
         }
-        resultEl.hidden = false;
-        resultEl.innerHTML = 'Entrega estimada para <b>' + local + '</b>: ' + dias + ' dias úteis — frete estimado ' + valor + '.<br><span style="font-weight:500;font-size:.76rem;">Valor final calculado e confirmado pelo consultor no WhatsApp.</span>';
+
+        geocode(raw).then(function(dest){
+          if(box._freightReq !== requestId) return; // resposta antiga, ignora
+          var distLinha = haversineKm(ORIGEM_LAT, ORIGEM_LON, dest.lat, dest.lon);
+          var distEstrada = distLinha * 1.3; // fator de correção rodoviária
+          renderFreightResult(box, resultEl, dest.nome, distEstrada, pesoClasse(box.getAttribute('data-sku')));
+        }).catch(function(){
+          if(box._freightReq !== requestId) return;
+          resultEl.innerHTML = 'Não encontramos esse local. Tente digitar o nome da cidade com o estado (ex: "Juazeiro do Norte-CE") ou o CEP completo.';
+        });
       }
+
+      function renderFreightResult(box, resultEl, destinoNome, distKm, classe){
+        var valor = precoFrete(distKm, classe);
+        var dias = distKm === 0 ? '0 a 1' : (Math.max(1, Math.ceil(distKm/450)) + ' a ' + (Math.max(1, Math.ceil(distKm/450)) + 2));
+        var valorFmt = formatBRL(valor);
+        var distFmt = distKm === 0 ? '' : ' (~' + Math.round(distKm) + ' km por rodovia)';
+        resultEl.innerHTML =
+          'Frete de Fortaleza-CE até <b>' + escapeHtml(destinoNome) + '</b>' + distFmt + ':<br>' +
+          '<span class="sc-freight-value">' + valorFmt + '</span> · prazo estimado ' + dias + ' dias úteis' +
+          '<div class="sc-freight-actions">' +
+            '<button type="button" class="btn btn-primary sc-freight-accept">Aceitar frete e falar com consultor</button>' +
+          '</div>' +
+          '<span class="sc-freight-disclaimer">Valor estimado por distância real; o consultor confirma o valor final e a transportadora no WhatsApp.</span>';
+        resultEl.querySelector('.sc-freight-accept').addEventListener('click', function(){
+          var nome = box.getAttribute('data-nome') || 'produto';
+          var msg = 'Olá! Quero confirmar o frete para *' + nome + '* até ' + destinoNome + '. Valor estimado do frete: ' + valorFmt + ' (prazo ~' + dias + ' dias úteis). Pode confirmar?';
+          window.open('https://wa.me/558581748100?text=' + encodeURIComponent(msg), '_blank', 'noopener,noreferrer');
+        });
+      }
+
       bodyEl.querySelectorAll('.sc-freight-box').forEach(function(box){
         var input = box.querySelector('.sc-freight-input');
         var btn = box.querySelector('.sc-freight-btn');
         var debounceTimer = null;
         input.addEventListener('input', function(){
           clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(function(){ calcFreight(box); }, 250);
+          debounceTimer = setTimeout(function(){ calcFreight(box); }, 700);
         });
-        input.addEventListener('blur', function(){ clearTimeout(debounceTimer); calcFreight(box); });
+        input.addEventListener('keydown', function(e){
+          if(e.key === 'Enter'){ clearTimeout(debounceTimer); calcFreight(box); }
+        });
         if(btn){
           btn.addEventListener('click', function(){ clearTimeout(debounceTimer); calcFreight(box); });
         }
