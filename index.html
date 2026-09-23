@@ -495,6 +495,17 @@
   }
   .sc-freight-alt-title{margin:0;font-size:.8rem;font-weight:800;color:#0a0a0a;}
   .sc-freight-alt-text{margin:0;font-size:.76rem;color:rgba(10,10,10,.75);line-height:1.4;}
+  .sc-freight-carriers{display:flex;flex-direction:column;gap:5px;}
+  .sc-freight-carrier{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    background:#fff;border:1px solid rgba(10,10,10,.18);border-radius:6px;
+    padding:7px 10px;text-decoration:none;
+  }
+  .sc-freight-carrier-name{font-size:.78rem;font-weight:700;color:#0a0a0a;}
+  .sc-freight-carrier-phone{
+    font-size:.78rem;font-weight:800;color:#0a0a0a;background:var(--yellow);
+    border-radius:20px;padding:2px 9px;white-space:nowrap;
+  }
   .sc-freight-alt-btn{
     align-self:flex-start;background:transparent;color:#0a0a0a;border:1px solid rgba(10,10,10,.4);
     padding:6px 12px;border-radius:6px;font-size:.76rem;font-weight:700;cursor:pointer;
@@ -1483,7 +1494,15 @@
       // Lista de transportadoras que a WUANG também utiliza/consulta, mas cuja tabela
       // é negociada por CNPJ (não pública) — por isso não são calculadas automaticamente,
       // só sugeridas para consulta direta com o setor comercial.
-      var OUTRAS_TRANSPORTADORAS = ['Jadlog', 'Loggi', 'J&T Express', 'Braspress', 'Total Express', 'Azul Cargo Express', 'LATAM Cargo'];
+      var OUTRAS_TRANSPORTADORAS = [
+        {nome:'Jadlog', telefone:'0800 729 5080', tel:'08007295080'},
+        {nome:'Loggi', telefone:'(11) 4020-1460', tel:'+551140201460'},
+        {nome:'J&T Express', telefone:'0800 055 0050', tel:'08000550050'},
+        {nome:'Braspress', telefone:'0800 775 3333', tel:'08007753333'},
+        {nome:'Total Express', telefone:'(11) 3627-5900', tel:'+551136275900'},
+        {nome:'Azul Cargo Express', telefone:'0800 884 4040', tel:'08008844040'},
+        {nome:'LATAM Cargo', telefone:'0300 115 9999', tel:'03001159999'}
+      ];
 
       function calcularFreteCorreios(distKm, classe){
         var zona = freteZona(distKm);
@@ -1564,7 +1583,15 @@
         var resultado = calcularFreteCorreios(distKm, classe);
         var valorFmt = formatBRL(resultado.valor);
         var distFmt = distKm === 0 ? '' : ' (~' + Math.round(distKm) + ' km por rodovia)';
-        var outrasFmt = OUTRAS_TRANSPORTADORAS.join(', ');
+        var outrasFmt = OUTRAS_TRANSPORTADORAS.map(function(t){ return t.nome; }).join(', ');
+        var transportadorasHtml = OUTRAS_TRANSPORTADORAS.map(function(t){
+          return (
+            '<a class="sc-freight-carrier" href="tel:' + t.tel + '">' +
+              '<span class="sc-freight-carrier-name">' + escapeHtml(t.nome) + '</span>' +
+              '<span class="sc-freight-carrier-phone">' + escapeHtml(t.telefone) + '</span>' +
+            '</a>'
+          );
+        }).join('');
 
         var avisoLimite = resultado.excedeLimite
           ? '<p class="sc-freight-limit-note">Este item ultrapassa o limite oficial de 30 kg por objeto dos Correios — o valor acima é apenas uma referência interna calculada com a mesma fórmula; para este produto, o envio real será feito por uma transportadora de carga.</p>'
@@ -1586,8 +1613,9 @@
           '</div>' +
           '<div class="sc-freight-alt-box">' +
             '<p class="sc-freight-alt-title">Prefere outra transportadora?</p>' +
-            '<p class="sc-freight-alt-text">A WUANG também trabalha com ' + escapeHtml(outrasFmt) + '. Como essas empresas negociam tabela própria por contrato, o preço não é calculado automaticamente aqui — fale com o setor comercial para cotar.</p>' +
-            '<button type="button" class="sc-freight-alt-btn">Consultar outra transportadora com o comercial</button>' +
+            '<p class="sc-freight-alt-text">A WUANG também trabalha com estas transportadoras. Como elas negociam tabela própria por contrato, o preço não é calculado automaticamente aqui — toque no telefone para ligar direto e cotar.</p>' +
+            '<div class="sc-freight-carriers">' + transportadorasHtml + '</div>' +
+            '<button type="button" class="sc-freight-alt-btn">Falar com o comercial da WUANG sobre outra transportadora</button>' +
           '</div>' +
           '<span class="sc-freight-disclaimer">Valor estimado com base na tabela pública dos Correios (PAC/SEDEX) por peso e distância. O consultor confirma o valor final no WhatsApp.</span>';
 
