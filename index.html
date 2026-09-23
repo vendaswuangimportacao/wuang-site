@@ -497,14 +497,18 @@
   .sc-freight-alt-text{margin:0;font-size:.76rem;color:rgba(10,10,10,.75);line-height:1.4;}
   .sc-freight-carriers{display:flex;flex-direction:column;gap:5px;}
   .sc-freight-carrier{
-    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
     background:#fff;border:1px solid rgba(10,10,10,.18);border-radius:6px;
-    padding:7px 10px;text-decoration:none;
+    padding:7px 10px;
   }
-  .sc-freight-carrier-name{font-size:.78rem;font-weight:700;color:#0a0a0a;}
+  .sc-freight-carrier-name{font-size:.78rem;font-weight:700;color:#0a0a0a;flex:none;}
+  .sc-freight-carrier-links{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto;}
+  .sc-freight-carrier-site{
+    font-size:.72rem;font-weight:600;color:#0a5fb8;text-decoration:underline;white-space:nowrap;
+  }
   .sc-freight-carrier-phone{
     font-size:.78rem;font-weight:800;color:#0a0a0a;background:var(--yellow);
-    border-radius:20px;padding:2px 9px;white-space:nowrap;
+    border-radius:20px;padding:2px 9px;white-space:nowrap;text-decoration:none;
   }
   .sc-freight-alt-btn{
     align-self:flex-start;background:transparent;color:#0a0a0a;border:1px solid rgba(10,10,10,.4);
@@ -1495,13 +1499,13 @@
       // é negociada por CNPJ (não pública) — por isso não são calculadas automaticamente,
       // só sugeridas para consulta direta com o setor comercial.
       var OUTRAS_TRANSPORTADORAS = [
-        {nome:'Jadlog', telefone:'0800 729 5080', tel:'08007295080'},
-        {nome:'Loggi', telefone:'(11) 4020-1460', tel:'+551140201460'},
-        {nome:'J&T Express', telefone:'0800 055 0050', tel:'08000550050'},
-        {nome:'Braspress', telefone:'0800 775 3333', tel:'08007753333'},
-        {nome:'Total Express', telefone:'(11) 3627-5900', tel:'+551136275900'},
-        {nome:'Azul Cargo Express', telefone:'0800 884 4040', tel:'08008844040'},
-        {nome:'LATAM Cargo', telefone:'0300 115 9999', tel:'03001159999'}
+        {nome:'Jadlog', telefone:'0800 729 5080', tel:'08007295080', site:'https://www.jadlog.com.br', siteLabel:'www.jadlog.com.br'},
+        {nome:'Loggi', telefone:'(11) 4020-1460', tel:'+551140201460', site:'https://www.loggi.com', siteLabel:'www.loggi.com'},
+        {nome:'J&T Express', telefone:'0800 055 0050', tel:'08000550050', site:'https://www.jtexpress.com.br', siteLabel:'www.jtexpress.com.br'},
+        {nome:'Braspress', telefone:'0800 775 3333', tel:'08007753333', site:'https://www.braspress.com', siteLabel:'www.braspress.com'},
+        {nome:'Total Express', telefone:'(11) 3627-5900', tel:'+551136275900', site:'https://www.totalexpress.com.br', siteLabel:'www.totalexpress.com.br'},
+        {nome:'Azul Cargo Express', telefone:'0800 884 4040', tel:'08008844040', site:'https://www.azulcargoexpress.com.br', siteLabel:'www.azulcargoexpress.com.br'},
+        {nome:'LATAM Cargo', telefone:'0300 115 9999', tel:'03001159999', site:'https://www.latamcargo.com/pt', siteLabel:'www.latamcargo.com'}
       ];
 
       function calcularFreteCorreios(distKm, classe){
@@ -1586,10 +1590,13 @@
         var outrasFmt = OUTRAS_TRANSPORTADORAS.map(function(t){ return t.nome; }).join(', ');
         var transportadorasHtml = OUTRAS_TRANSPORTADORAS.map(function(t){
           return (
-            '<a class="sc-freight-carrier" href="tel:' + t.tel + '">' +
+            '<div class="sc-freight-carrier">' +
               '<span class="sc-freight-carrier-name">' + escapeHtml(t.nome) + '</span>' +
-              '<span class="sc-freight-carrier-phone">' + escapeHtml(t.telefone) + '</span>' +
-            '</a>'
+              '<span class="sc-freight-carrier-links">' +
+                '<a class="sc-freight-carrier-site" href="' + t.site + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(t.siteLabel) + '</a>' +
+                '<a class="sc-freight-carrier-phone" href="tel:' + t.tel + '">' + escapeHtml(t.telefone) + '</a>' +
+              '</span>' +
+            '</div>'
           );
         }).join('');
 
